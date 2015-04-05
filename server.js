@@ -1,4 +1,4 @@
-var angular = require('angularjs-node'),
+var angularFactory = require('angularjs-node'),
     jade = require('jade'),
     fs = require('fs'),
     app = require('express')(),
@@ -8,17 +8,27 @@ var angular = require('angularjs-node'),
 // Get our application's index template content
 index = jade.render(fs.readFileSync('templates/index.jade'));
 
-// Give angular to ngRemote since dependencies are a mess in node
-require('ngRemote').setup(angular);
+app.get('/*', function (request, response, next) {
+  var angular,
+      url = request.protocol + '://' + request.get('host') + request.originalUrl;
 
-app.get('/', function (req, res) {
-  res.writeHead(200, {
-    'Content-Type': 'text/html'
+
+  jsdom.env({
+    url: url,
+    html: index,
+    done: function (errors, window) {
+      angular = angularFactory(window);
+
+      require('ngRemote').setup(angular);
+      angular.bootstrap(window.document, ['remote']);
+
+      response.writeHead(200, {
+        'Content-Type': 'text/html'
+      });
+
+      response.end(window.document.documentElement.outerHTML);
+    }
   });
-
-  var document = jsdom.jsdom(index);
-  angular.bootstrap(document, ['remote']);
-  res.end(document.documentElement.outerHTML);
 });
 
 app.listen(8080);
